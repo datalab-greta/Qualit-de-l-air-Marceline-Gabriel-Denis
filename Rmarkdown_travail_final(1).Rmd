@@ -1,0 +1,207 @@
+---
+title: "Les différents polluants en region centre"
+author: "Denis, Marceline et Gabriel"
+date: "30/05/2019"
+output:
+  html_document: 
+    fig_caption: yes
+    toc: yes
+  pdf_document: default
+---
+
+## Lig'Air
+Lig'Air est une association qui met à disposition des jeu de données sur la surveillance de la qualité de l'air dans la région centre sur son portail Open Data.
+Le jeu de données que l'on utilise dans notre cas représente les taux de pollution au cours de l'année  2018. Nous allons procéder a l'importation des données via le portail open data de Lig'air puis nous allons les ordonner.
+
+# Ici on actionne la lecture des library nécessaires pour la suite :
+Ces librairies seront nécessaires au bon fonctionnement du code par la suite. 
+```{r library, message=FALSE, warning=FALSE}
+library(httr)
+library(jsonlite)
+library(dplyr)
+library(leaflet)
+require(devtools)
+library(markdown)
+library(geojson)
+library(ggplot2)
+library(htmlwidgets)
+library(htmltools)
+```
+
+# On procède au chargement des données via l'API:
+On importe les données mises a disposition par Open Lig'Air via une API
+```{r Données}
+Projet1<-"https://services1.arcgis.com/HzzPcgRsxxyIZdlU/arcgis/rest/services/Concentrations_annuelles/FeatureServer/0/query?where=1%3D1&outFields=*&outSR=4326&f=json"
+Projet2<-httr::GET(Projet1)
+Projet3<-httr::content(Projet2)
+Projet3FROM<-jsonlite::fromJSON(Projet3, flatten=TRUE)
+Projet<-Projet3FROM$features
+View(Projet)
+```
+
+# On procède à un regroupement des colonnes/lignes qui nous intéressent afin de pouvoir calculer la moyenne par la suite :
+```{r eval, message=FALSE, warning=FALSE, include=FALSE}
+Projet4 <- as.data.frame(Projet)
+
+Projet4[,c(2,8,10,11,16,17)]
+Projets<-Projet4[,c(2,8,10,11,16,17)]
+Projetn<-Projets [-c(25:57,100:129,170:175,234:310,318:359),]
+```
+
+# On procède a un recoupement des données avec un calcul des moyennes des polluants par ville :
+```{r stat moyenne}
+stat_polluant_commune <- Projetn %>%
+  group_by( attributes.nom_com, attributes.nom_polluant,attributes.x_wgs84,attributes.y_wgs84) %>%
+  summarise(moyenne = mean(attributes.valeur),
+            mediane = median(attributes.valeur),
+            mini = min(attributes.valeur),
+            maxi = max(attributes.valeur))
+```
+
+# ainsi qu'une sélection de la moyenne de chacun des polluants :
+```{r moyenne polluant}
+NO<-filter(stat_polluant_commune, attributes.nom_polluant=="NO")
+NO2<-filter(stat_polluant_commune, attributes.nom_polluant=="NO2")
+O3<-filter(stat_polluant_commune, attributes.nom_polluant=="O3")
+Pm10<-filter(stat_polluant_commune, attributes.nom_polluant=="PM10")
+Pm2.5<-filter(stat_polluant_commune, attributes.nom_polluant=="PM2.5")
+```
+
+Le NO correspond a l'Oxyde d'Azote.
+Le NO2 correspond au dioxyde d'Azote, un derivé du NO aprés oxydation dans l'air.
+L'O3 correspond a l'Ozone qui est toxique en quantité trop importantes dans l'atmosphère.
+Les Pm10 sont des particules en suspension dans l'air dont le diamètre est inférieur à 10 micromètres
+Les Pm 2.5 ont un diamètre inférieur a 2.5 micromètres et sont plus nocives car elles sont absorbées plus rapidement par l'organisme.
+
+# On télécharge le fond de carte pour le NO et on sélectionne la vue :
+```{r carte, echo=TRUE}
+carte <- leaflet::leaflet() %>%
+  leaflet::addTiles() %>%
+  leaflet::setView(lng = 1.693130, lat = 46.79827, zoom = 12)
+print (carte)
+#on attribue les variables longitude, latitude et radiuso
+Longi <- NO$attributes.x_wgs84
+Latti <- NO$attributes.y_wgs84
+radius2 <- NO$moyenne
+#on place les points sur la carte
+carte <- carte %>%
+  leaflet::addCircleMarkers(lng = Longi, lat = Latti, weight = 1, radius = radius2*3, color = "purple")
+print (carte)
+
+## Sauvegarde de la carte
+htmlwidgets::saveWidget(widget=carte, file="ma_carte_1.html", selfcontained = TRUE)
+## Affichage  de la carte
+htmltools::tags$iframe(title = "Ma carte1", width = "700", height = "700", src = "ma_carte_1.html")
+```
+
+# On fait la meme chose mais cette fois pour le NO2:
+```{r carte2, echo=TRUE}
+carte2 <- leaflet::leaflet() %>%
+  leaflet::addTiles() %>%
+  leaflet::setView(lng = 1.693130, lat = 46.79827, zoom = 12)
+print (carte2)
+#on attribue les variables longitude, latitude et radius
+Longi <- NO2$attributes.x_wgs84
+Latti <- NO2$attributes.y_wgs84
+radius2 <- NO2$moyenne
+#on place les points sur la carte
+carte2 <- carte2 %>%
+  leaflet::addCircleMarkers(lng = Longi, lat = Latti, weight = 1, radius = radius2*3, color = "blue")
+print (carte2)
+
+## Sauvegarde de la carte
+htmlwidgets::saveWidget(widget=carte2, file="ma_carte_2.html", selfcontained = TRUE)
+## Affichage  de la carte
+htmltools::tags$iframe(title = "Ma carte2", width = "700", height = "700", src = "ma_carte_2.html")
+```
+
+# Cette fois pour le PM10 :
+```{r carte3, echo=TRUE}
+carte3 <- leaflet::leaflet() %>%
+  leaflet::addTiles() %>%
+  leaflet::setView(lng = 1.693130, lat = 46.79827, zoom = 12)
+print (carte3)
+#on attribue les variables longitude, latitude et radius
+Longi <- Pm10$attributes.x_wgs84
+Latti <- Pm10$attributes.y_wgs84
+radius2 <- Pm10$moyenne
+#on place les points sur la carte
+carte3 <- carte3 %>%
+  leaflet::addCircleMarkers(lng = Longi, lat = Latti, weight = 1, radius = radius2*3, color = "red")
+print (carte3)
+
+## Sauvegarde de la carte
+htmlwidgets::saveWidget(widget=carte3, file="ma_carte_3.html", selfcontained = TRUE)
+## Affichage  de la carte
+htmltools::tags$iframe(title = "Ma carte3", width = "700", height = "700", src = "ma_carte_3.html")
+```
+
+# La carte pour le O3:
+
+```{r carte4, echo=TRUE}
+carte4 <- leaflet::leaflet() %>%
+  leaflet::addTiles() %>%
+  leaflet::setView(lng = 1.693130, lat = 46.79827, zoom = 12)
+print (carte4)
+#on attribue les variables longitude, latitude et radius
+Longi <- O3$attributes.x_wgs84
+Latti <- O3$attributes.y_wgs84
+radius2 <- O3$moyenne
+#on place les points sur la carte
+carte4 <- carte4 %>%
+  leaflet::addCircleMarkers(lng = Longi, lat = Latti, weight = 1, radius = radius2*2, color = "yellow")
+print (carte4)
+
+## Sauvegarde de la carte
+htmlwidgets::saveWidget(widget=carte4, file="ma_carte_4.html", selfcontained = TRUE)
+## Affichage  de la carte
+htmltools::tags$iframe(title = "Ma carte4", width = "700", height = "700", src = "ma_carte_4.html")
+```
+
+
+# et finalement pour les pm2.5:
+```{r carte5, echo=TRUE}
+carte5 <- leaflet::leaflet() %>%
+  leaflet::addTiles() %>%
+  leaflet::setView(lng = 1.693130, lat = 46.79827, zoom = 12)
+print (carte5)
+#on attribue les variables longitude, latitude et radius
+Longi <- Pm2.5$attributes.x_wgs84
+Latti <- Pm2.5$attributes.y_wgs84
+radius2 <- Pm2.5$moyenne
+#on place les points sur la carte
+carte5 <- carte5 %>%
+  leaflet::addCircleMarkers(lng = Longi, lat = Latti, weight = 1, radius = radius2*6, color = "green")
+print (carte5)
+
+## Sauvegarde de la carte
+htmlwidgets::saveWidget(widget=carte5, file="ma_carte_5.html", selfcontained = TRUE)
+## Affichage  de la carte
+htmltools::tags$iframe(title = "Ma carte5", width = "700", height = "700", src = "ma_carte_5.html")
+```
+
+
+
+Apercu de la solution annexe developpé ce week-end:
+
+# Ici on inclut la carte qui rend compte des taux de pollution pour le NO dans nos villes selectionnées: 
+
+```{r}
+knitr::include_graphics("graphiqueNO.png")
+```
+
+# Ici on inclut la carte qui rend compte des taux de pollutions pour le NO2 dans nos villes selectionnées:
+```{r}
+knitr::include_graphics("graphique NO2.png")
+```
+
+
+# Ici on met en place un graphique qui résume les différents taux de pollution pour les villes sélectionnées:
+```{r graphique final}
+Commune<-Projetn$attributes.nom_com
+PValeur<-Projetn$attributes.valeur
+
+ggplot(data = Projetn, aes(x=Commune, y=PValeur, color = attributes.nom_polluant)) + geom_bar(position = "dodge", stat = "Identity")
+```
+
+
